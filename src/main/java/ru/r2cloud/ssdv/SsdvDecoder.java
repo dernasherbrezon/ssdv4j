@@ -8,21 +8,16 @@ import java.util.NoSuchElementException;
 
 public class SsdvDecoder implements Iterator<SsdvImage> {
 
-	private static final int DEFAULT_SAMPLING = 1;
 	private final Iterator<SsdvPacket> packets;
 	private boolean hasNext = false;
 
 	private DataUnitDecoder dataUnitDecoder;
+	private McuDecoder mcuDecoder;
 	private int currentMcu = 0;
-	private int maxYCols;
-	private int maxYRows;
+	private int currentX = 0;
+	private int currentY = 0;
 
-	// Cb and Cr always have 1x1 in ssdv
-	private int maxCbCols = DEFAULT_SAMPLING;
-	private int maxCbRows = DEFAULT_SAMPLING;
-	private int maxCrCols = DEFAULT_SAMPLING;
-	private int maxCrRows = DEFAULT_SAMPLING;
-
+	private SsdvPacket currentPacket = null;
 	private SsdvPacket previousPacket = null;
 	private SsdvImage currentImage = null;
 	private SsdvImage completedImage = null;
@@ -31,6 +26,7 @@ public class SsdvDecoder implements Iterator<SsdvImage> {
 		Collections.sort(packets, SsdvPacketComparator.INSTANCE);
 		this.packets = packets.iterator();
 		this.dataUnitDecoder = new DataUnitDecoder();
+		this.mcuDecoder = new McuDecoder();
 	}
 
 	public SsdvDecoder(Iterator<SsdvPacket> packets) {
@@ -45,15 +41,17 @@ public class SsdvDecoder implements Iterator<SsdvImage> {
 
 	private boolean hasNextInternal() {
 		while (packets.hasNext()) {
-			SsdvPacket currentPacket = packets.next();
+			currentPacket = packets.next();
 
 			// handle image start/finish
 			if (currentImage == null) {
 				currentImage = create(currentPacket);
+				mcuDecoder.reset(currentPacket);
 			} else {
 				if (currentImage.getImageId() != currentPacket.getImageId()) {
 					completeImage();
 					currentImage = create(currentPacket);
+					mcuDecoder.reset(currentPacket);
 				}
 			}
 
@@ -72,8 +70,17 @@ public class SsdvDecoder implements Iterator<SsdvImage> {
 				}
 			}
 
-			// FIXME process remaining du
-			// FIXME start next MCU
+			// append to mcuDecoder until next MCU is available
+			// MCU might be partially filled in the mcuDecoder
+			// read the next packet with the remaining DU to finish MCU
+			while (dataUnitDecoder.hasNext()) {
+				int[] rgb = mcuDecoder.append(dataUnitDecoder.next());
+				// not enough data for mcu to complete
+				if (rgb == null) {
+					continue;
+				}
+				drawMcu(rgb);
+			}
 
 			previousPacket = currentPacket;
 
@@ -91,9 +98,9 @@ public class SsdvDecoder implements Iterator<SsdvImage> {
 		}
 	}
 
-	private static byte[] skipTheOffset(SsdvPacket currentPacket) {
-		byte[] data = new byte[currentPacket.getPayload().length - currentPacket.getMcuOffset()];
-		System.arraycopy(currentPacket.getPayload(), currentPacket.getMcuOffset(), data, 0, data.length);
+	private static byte[] skipTheOffset(SsdvPacket packet) {
+		byte[] data = new byte[packet.getPayload().length - packet.getMcuOffset()];
+		System.arraycopy(packet.getPayload(), packet.getMcuOffset(), data, 0, data.length);
 		return data;
 	}
 
@@ -112,35 +119,38 @@ public class SsdvDecoder implements Iterator<SsdvImage> {
 		if (currentMcu == nextMcu) {
 			return;
 		}
-		//FIXME finish DU in current mCU
-		// generate empty MCU until expected
+		drawMcu(mcuDecoder.finishCurrentMcu());
+		for (int i = currentMcu; i < nextMcu; i++) {
+			drawMcu(mcuDecoder.createEmptyMcu());
+		}
 	}
 
-	private SsdvImage create(SsdvPacket firstPacket) {
+	private void drawMcu(int[] rgb) {
+		if (currentX + McuDecoder.PIXELS_PER_MCU >= currentImage.getImage().getWidth()) {
+			currentX = 0;
+			currentY += McuDecoder.PIXELS_PER_MCU;
+		} else {
+			currentX += McuDecoder.PIXELS_PER_MCU;
+		}
+
+		// defensive
+		if (currentY >= currentImage.getImage().getHeight()) {
+			return;
+		}
+
+		for (int j = 0; j < McuDecoder.PIXELS_PER_MCU; j++) {
+			for (int i = 0; i < McuDecoder.PIXELS_PER_MCU; i++) {
+				currentImage.getImage().setRGB(currentX + i, currentY + j, rgb[j * McuDecoder.PIXELS_PER_MCU + i]);
+			}
+		}
+		currentMcu++;
+	}
+
+	private static SsdvImage create(SsdvPacket firstPacket) {
 		SsdvImage result = new SsdvImage();
 		result.setImageId(firstPacket.getImageId());
 		result.setTotalMcu(firstPacket.getHeightMcu() * firstPacket.getWidthMcu());
-		result.setImage(new BufferedImage(firstPacket.getWidthMcu() * 16, firstPacket.getHeightMcu() * 16, BufferedImage.TYPE_INT_RGB));
-		switch (firstPacket.getSubsamplingMode()) {
-		case 0:
-			maxYCols = 2;
-			maxYRows = 2;
-			break;
-		case 1:
-			maxYCols = 1;
-			maxYRows = 2;
-			break;
-		case 2:
-			maxYCols = 2;
-			maxYRows = 1;
-			break;
-		case 3:
-			maxYCols = 1;
-			maxYRows = 1;
-			break;
-		default:
-			throw new IllegalArgumentException("unsupported subsampling mode: " + firstPacket.getSubsamplingMode());
-		}
+		result.setImage(new BufferedImage(firstPacket.getWidthMcu() * McuDecoder.PIXELS_PER_MCU, firstPacket.getHeightMcu() * McuDecoder.PIXELS_PER_MCU, BufferedImage.TYPE_INT_RGB));
 		return result;
 	}
 
