@@ -60,11 +60,11 @@ public class SsdvDecoder implements Iterator<SsdvImage> {
 				if (currentPacket.getPacketId() > 0) {
 					fillTheGap(currentPacket.getMcuIndex());
 				}
-				dataUnitDecoder.reset(skipTheOffset(currentPacket));
+				dataUnitDecoder.reset(skipTheOffset(currentPacket), currentPacket.getJpegQualityLevel());
 			} else {
 				if (currentPacket.getPacketId() - 1 > previousPacket.getPacketId()) {
 					fillTheGap(currentPacket.getMcuIndex());
-					dataUnitDecoder.reset(skipTheOffset(currentPacket));
+					dataUnitDecoder.reset(skipTheOffset(currentPacket), currentPacket.getJpegQualityLevel());
 				} else {
 					dataUnitDecoder.append(currentPacket.getPayload());
 				}
@@ -73,7 +73,7 @@ public class SsdvDecoder implements Iterator<SsdvImage> {
 			// append to mcuDecoder until next MCU is available
 			// MCU might be partially filled in the mcuDecoder
 			// read the next packet with the remaining DU to finish MCU
-			while (dataUnitDecoder.hasNext()) {
+			while (dataUnitDecoder.hasNext(mcuDecoder.isYComponent())) {
 				int[] rgb = mcuDecoder.append(dataUnitDecoder.next());
 				// not enough data for mcu to complete
 				if (rgb == null) {

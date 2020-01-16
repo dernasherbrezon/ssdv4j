@@ -124,4 +124,8 @@ class McuDecoder {
 		return rgb;
 	}
 
+	public boolean isYComponent() {
+		return !yComponent.isFull();
+	}
+
 }

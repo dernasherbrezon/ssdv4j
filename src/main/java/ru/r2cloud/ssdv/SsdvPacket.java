@@ -16,6 +16,8 @@ public class SsdvPacket {
 	private int mcuIndex;
 
 	private byte[] payload;
+	private int checksum;
+	private byte[] fec;
 
 	public int getPacketType() {
 		return packetType;
@@ -105,4 +107,25 @@ public class SsdvPacket {
 		this.payload = payload;
 	}
 
+	public int getChecksum() {
+		return checksum;
+	}
+
+	public void setChecksum(int checksum) {
+		this.checksum = checksum;
+	}
+
+	public byte[] getFec() {
+		return fec;
+	}
+	
+	public void setFec(byte[] fec) {
+		this.fec = fec;
+	}
+
+	@Override
+	public String toString() {
+		return "SsdvPacket [packetType=" + packetType + ", imageId=" + imageId + ", packetId=" + packetId + ", widthMcu=" + widthMcu + ", heightMcu=" + heightMcu + ", jpegQualityLevel=" + jpegQualityLevel + ", lastPacket=" + lastPacket + ", subsamplingMode=" + subsamplingMode + ", mcuOffset=" + mcuOffset + ", mcuIndex=" + mcuIndex + ", payload=<bytes>, checksum=" + checksum + ", fec=<bytes>]";
+	}
+	
 }
