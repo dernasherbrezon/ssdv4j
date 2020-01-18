@@ -1,6 +1,7 @@
 package ru.r2cloud.ssdv;
 
 import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -31,6 +32,8 @@ public class SsdvDecoder implements Iterator<SsdvImage> {
 
 	public SsdvDecoder(Iterator<SsdvPacket> packets) {
 		this.packets = packets;
+		this.dataUnitDecoder = new DataUnitDecoder();
+		this.mcuDecoder = new McuDecoder();
 	}
 
 	@Override
@@ -73,16 +76,24 @@ public class SsdvDecoder implements Iterator<SsdvImage> {
 			// append to mcuDecoder until next MCU is available
 			// MCU might be partially filled in the mcuDecoder
 			// read the next packet with the remaining DU to finish MCU
-			while (dataUnitDecoder.hasNext(mcuDecoder.isYComponent())) {
-				int[] rgb = mcuDecoder.append(dataUnitDecoder.next());
-				// not enough data for mcu to complete
-				if (rgb == null) {
-					continue;
+			try {
+				while (dataUnitDecoder.hasNext(mcuDecoder.isYComponent(), mcuDecoder.isCbComponent(), mcuDecoder.isCrComponent())) {
+					int[] rgb = mcuDecoder.append(dataUnitDecoder.next());
+					// not enough data for mcu to complete
+					if (rgb == null) {
+						continue;
+					}
+					drawMcu(rgb);
+					if (currentMcu == currentPacket.getMcuIndex()) {
+						// that means previous mcu came from the previous packet
+						dataUnitDecoder.resetToTheNextByte();
+					}
 				}
-				drawMcu(rgb);
+				previousPacket = currentPacket;
+			} catch (IOException e) {
+				// this will trigger reset and filling gap
+				previousPacket = null;
 			}
-
-			previousPacket = currentPacket;
 
 			if (completedImage != null) {
 				return true;
@@ -107,6 +118,7 @@ public class SsdvDecoder implements Iterator<SsdvImage> {
 	private void completeImage() {
 		fillTheGap(currentImage.getTotalMcu());
 		reset();
+		// FIXME set the number of successfull MCU
 		completedImage = currentImage;
 	}
 
@@ -126,13 +138,6 @@ public class SsdvDecoder implements Iterator<SsdvImage> {
 	}
 
 	private void drawMcu(int[] rgb) {
-		if (currentX + McuDecoder.PIXELS_PER_MCU >= currentImage.getImage().getWidth()) {
-			currentX = 0;
-			currentY += McuDecoder.PIXELS_PER_MCU;
-		} else {
-			currentX += McuDecoder.PIXELS_PER_MCU;
-		}
-
 		// defensive
 		if (currentY >= currentImage.getImage().getHeight()) {
 			return;
@@ -142,6 +147,13 @@ public class SsdvDecoder implements Iterator<SsdvImage> {
 			for (int i = 0; i < McuDecoder.PIXELS_PER_MCU; i++) {
 				currentImage.getImage().setRGB(currentX + i, currentY + j, rgb[j * McuDecoder.PIXELS_PER_MCU + i]);
 			}
+		}
+		
+		if (currentX + McuDecoder.PIXELS_PER_MCU >= currentImage.getImage().getWidth()) {
+			currentX = 0;
+			currentY += McuDecoder.PIXELS_PER_MCU;
+		} else {
+			currentX += McuDecoder.PIXELS_PER_MCU;
 		}
 		currentMcu++;
 	}

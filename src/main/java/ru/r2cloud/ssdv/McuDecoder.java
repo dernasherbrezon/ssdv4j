@@ -6,7 +6,8 @@ class McuDecoder {
 
 	static final int PIXELS_PER_MCU = 16;
 	private static final int DEFAULT_SAMPLING = 1;
-	private static final int[] DEFAULT_DU = new int[DataUnitDecoder.PIXELS_PER_DU * DataUnitDecoder.PIXELS_PER_DU];
+	private static final int[] DEFAULT_Y_DU = new int[DataUnitDecoder.PIXELS_PER_DU * DataUnitDecoder.PIXELS_PER_DU];
+	private static final int[] DEFAULT_CBCR_DU = new int[DataUnitDecoder.PIXELS_PER_DU * DataUnitDecoder.PIXELS_PER_DU];
 
 	private final ColorComponent yComponent = new ColorComponent();
 	private final ColorComponent cbComponent = new ColorComponent();
@@ -43,14 +44,20 @@ class McuDecoder {
 	// append until mcu full
 	// return decoded rgb
 	public int[] append(int[] du) {
-		if (!appendDu(du, yComponent)) {
+		if (!yComponent.isFull()) {
+			appendDu(du, yComponent);
 			return null;
 		}
-		if (!appendDu(du, cbComponent)) {
+		if (!cbComponent.isFull()) {
+			appendDu(du, cbComponent);
 			return null;
 		}
-		if (!appendDu(du, crComponent)) {
-			return null;
+		if (!crComponent.isFull()) {
+			appendDu(du, crComponent);
+			// last component needs one more du (unlikely)
+			if (!crComponent.isFull()) {
+				return null;
+			}
 		}
 
 		// here I assume cb and cr are always 1x1
@@ -66,15 +73,18 @@ class McuDecoder {
 				}
 			}
 		}
+
+		yComponent.reset();
+		cbComponent.reset();
+		crComponent.reset();
+
 		return rgb;
 	}
 
 	private static int convertToRgb(int y, int cb, int cr) {
-		cb = cb - 128;
-		cr = cr - 128;
-		double r = y + 1.402 * cr;
-		double g = y - 0.34414 * cb - 0.71414 * cr;
-		double b = y + 1.772 * cb;
+		double r = 1.402 * (cr - 128) + y;
+		double g = -0.34414 * (cb - 128) - 0.71414 * (cr - 128) + y;
+		double b = 1.772 * (cb - 128) + y;
 		return (clip(r) << 16) | (clip(g) << 8) | clip(b);
 	}
 
@@ -91,30 +101,34 @@ class McuDecoder {
 	// can be called multiple times
 	// do not append if already appened to mcu
 	// return false if current color component is not full
-	private static boolean appendDu(int[] du, ColorComponent component) {
-		if (component.isFull()) {
-			return true;
+	private static void appendDu(int[] du, ColorComponent component) {
+		for (int row = 0; row < DataUnitDecoder.PIXELS_PER_DU; row++) {
+			for (int col = 0; col < DataUnitDecoder.PIXELS_PER_DU; col++) {
+				int source = du[row * DataUnitDecoder.PIXELS_PER_DU + col];
+				int blockFullRows = component.getCurrentRow() * DataUnitDecoder.PIXELS_PER_DU * component.getMaxCols() * DataUnitDecoder.PIXELS_PER_DU;
+				int blockIndexRows = row * component.getMaxCols() * DataUnitDecoder.PIXELS_PER_DU;
+				int colOffset = component.getCurrentCol() * DataUnitDecoder.PIXELS_PER_DU;
+				component.getBuffer()[blockFullRows + blockIndexRows + colOffset + col] = source;
+			}
 		}
-
-		System.arraycopy(du, 0, component.getBuffer(), component.getCurrentRow() * component.getMaxCols() * DataUnitDecoder.PIXELS_PER_DU + component.getCurrentCol() * DataUnitDecoder.PIXELS_PER_DU, du.length);
 
 		component.incrementCol();
 		if (component.getCurrentCol() >= component.getMaxCols()) {
 			component.incrementRow();
 			if (component.getCurrentRow() < component.getMaxRows()) {
 				component.setCurrentCol(0);
-			} else {
-				// this was the last du in current color component
-				return true;
 			}
 		}
-		return false;
 	}
 
 	public int[] finishCurrentMcu() {
 		int[] result = null;
-		while (result == null || !Thread.currentThread().isInterrupted()) {
-			result = append(DEFAULT_DU);
+		while (result == null && !Thread.currentThread().isInterrupted()) {
+			if (isYComponent()) {
+				result = append(DEFAULT_Y_DU);
+			} else {
+				result = append(DEFAULT_CBCR_DU);
+			}
 		}
 		return result;
 	}
@@ -126,6 +140,19 @@ class McuDecoder {
 
 	public boolean isYComponent() {
 		return !yComponent.isFull();
+	}
+
+	public boolean isCbComponent() {
+		return yComponent.isFull() && !cbComponent.isFull();
+	}
+
+	public boolean isCrComponent() {
+		return yComponent.isFull() && cbComponent.isFull() && !crComponent.isFull();
+	}
+
+	@Override
+	public String toString() {
+		return "McuDecoder [y=" + yComponent + ", cb=" + cbComponent + ", cr=" + crComponent + "]";
 	}
 
 }

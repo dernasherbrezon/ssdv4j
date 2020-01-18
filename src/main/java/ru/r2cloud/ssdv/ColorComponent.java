@@ -21,18 +21,23 @@ class ColorComponent {
 		}
 	}
 
+	public void reset() {
+		this.currentCol = 0;
+		this.currentRow = 0;
+	}
+
 	public boolean isFull() {
 		return currentCol >= maxCols && currentRow >= maxRows;
 	}
-	
+
 	public void incrementCol() {
 		currentCol++;
 	}
-	
+
 	public void incrementRow() {
 		currentRow++;
 	}
-	
+
 	public int getMaxCols() {
 		return maxCols;
 	}
@@ -71,6 +76,11 @@ class ColorComponent {
 
 	public void setBuffer(int[] buffer) {
 		this.buffer = buffer;
+	}
+
+	@Override
+	public String toString() {
+		return "[maxCols=" + maxCols + ", maxRows=" + maxRows + ", currentCol=" + currentCol + ", currentRow=" + currentRow + "]";
 	}
 
 }
