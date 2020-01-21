@@ -84,8 +84,12 @@ public class SsdvDecoder implements Iterator<SsdvImage> {
 						continue;
 					}
 					drawMcu(rgb);
-					if (currentMcu == currentPacket.getMcuIndex()) {
-						// that means previous mcu came from the previous packet
+					// discard the rest of packet
+					if (currentMcu >= currentImage.getTotalMcu()) {
+						break;
+					}
+					// align beginning of the first mcu in the packet to byte
+					if (currentMcu > 0 && currentMcu == currentPacket.getMcuIndex()) {
 						dataUnitDecoder.resetToTheNextByte();
 					}
 				}
@@ -148,7 +152,7 @@ public class SsdvDecoder implements Iterator<SsdvImage> {
 				currentImage.getImage().setRGB(currentX + i, currentY + j, rgb[j * McuDecoder.PIXELS_PER_MCU + i]);
 			}
 		}
-		
+
 		if (currentX + McuDecoder.PIXELS_PER_MCU >= currentImage.getImage().getWidth()) {
 			currentX = 0;
 			currentY += McuDecoder.PIXELS_PER_MCU;

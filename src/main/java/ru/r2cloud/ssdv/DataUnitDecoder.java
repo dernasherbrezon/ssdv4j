@@ -16,6 +16,7 @@ class DataUnitDecoder {
 	private static final int TWO_BYTES_POSSIBLE_VALUES = (int) (Math.pow(2, 8) * Math.pow(2, 8));
 	private static final int BIT_IN_TWO_BYTES = 16;
 
+	// dqt tables arent' standard
 	private static final int[] Y_DQT_DEFAULT = new int[] { 0x10, 0x0C, 0x0C, 0x0E, 0x0C, 0x0A, 0x10, 0x0E, 0x0E, 0x0E, 0x12, 0x12, 0x10, 0x14, 0x18, 0x28, 0x1A, 0x18, 0x16, 0x16, 0x18, 0x32, 0x24, 0x26, 0x1E, 0x28, 0x3A, 0x34, 0x3E, 0x3C, 0x3A, 0x34, 0x38, 0x38, 0x40, 0x48, 0x5C, 0x4E, 0x40, 0x44, 0x58, 0x46, 0x38, 0x38, 0x50, 0x6E, 0x52, 0x58, 0x60, 0x62, 0x68, 0x68, 0x68, 0x3E, 0x4E, 0x72, 0x7A, 0x70, 0x64, 0x78, 0x5C, 0x66, 0x68, 0x64 };
 	private static final int[] CB_CR_DQT_DEFAULT = new int[] { 0x12, 0x12, 0x12, 0x16, 0x16, 0x16, 0x30, 0x1A, 0x1A, 0x30, 0x64, 0x42, 0x38, 0x42, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64 };
 	private static final int[] DQT_SCALES = new int[] { 5000, 357, 172, 116, 100, 58, 28, 0 };
@@ -131,7 +132,7 @@ class DataUnitDecoder {
 		}
 
 		for (int i = 0; i < zigzagDct.length; i++) {
-			dct[i] = zigzagDct[ZIGZAG_INDEXES[i]] * getDqt(isYComponent)[i];
+			dct[i] = zigzagDct[ZIGZAG_INDEXES[i]] * getDqt(isYComponent)[ZIGZAG_INDEXES[i]];
 		}
 		DCTTransform.inverse(dct, true);
 		for (int i = 0; i < dct.length; i++) {
@@ -146,6 +147,67 @@ class DataUnitDecoder {
 		// set previous only when DU fully read
 		previousDc[previousDcIndex] = zigzagDct[0];
 		return true;
+	}
+	
+	// TODO always append. Maybe shrink?
+	public void append(byte[] payload) {
+		byte[] newData = new byte[data.length + payload.length];
+		System.arraycopy(data, 0, newData, 0, data.length);
+		System.arraycopy(payload, 0, newData, data.length, payload.length);
+		this.data = newData;
+	}
+
+	public void resetToTheNextByte() {
+		int overflow = currentBitIndex % 8;
+		if (overflow > 0) {
+			currentBitIndex += (8 - currentBitIndex % 8);
+		}
+		// next packet starts with DC = 0
+		for (int i = 0; i < previousDc.length; i++) {
+			previousDc[i] = 0.0;
+		}
+	}
+
+	public void reset(byte[] data, int qualityLevel) {
+		if (this.qualityLevel == null || this.qualityLevel != qualityLevel) {
+			yDqt = adjustDqt(Y_DQT_DEFAULT, qualityLevel);
+			cbcrDqt = adjustDqt(CB_CR_DQT_DEFAULT, qualityLevel);
+			this.qualityLevel = qualityLevel;
+		}
+		hasNext = false;
+		currentBitIndex = 0;
+		for (int i = 0; i < previousDc.length; i++) {
+			previousDc[i] = 0.0;
+		}
+		this.data = data;
+	}
+
+	// FIXME append 2 bytes at the last packet just
+	private int peekNext(int numberOfBits) {
+		if (((currentBitIndex + numberOfBits) / 8) >= data.length) {
+			// numberOfBits is always less than 31
+			return -1;
+		}
+		int result = 0;
+		for (int i = 0; i < numberOfBits; i++) {
+			int bitIndex = currentBitIndex + i;
+			int currentByteIndex = bitIndex >> 3;
+			// peeking into next 16 bits might overflow byte array
+			// this is fine, since not all bits will be used for matching codeword
+			// stuff the overflow with zeroes
+			if (currentByteIndex >= data.length) {
+				result = result << 1;
+				continue;
+			}
+			int bit;
+			if (((data[currentByteIndex] & 0xFF) & (1 << (7 - (bitIndex & 7)))) != 0) {
+				bit = 1;
+			} else {
+				bit = 0;
+			}
+			result = (result << 1) | bit;
+		}
+		return result;
 	}
 
 	private int[] getDqt(boolean isYComponent) {
@@ -186,52 +248,11 @@ class DataUnitDecoder {
 		return lookupTable[index];
 	}
 
-	private int peekNext(int numberOfBits) {
-		if ((currentBitIndex >> 3) >= data.length) {
-			// numberOfBits is always less than 31
-			return -1;
-		}
-		int result = 0;
-		for (int i = 0; i < numberOfBits; i++) {
-			int bitIndex = currentBitIndex + i;
-			int currentByteIndex = bitIndex >> 3;
-			// peeking into next 16 bits might overflow byte array
-			// this is fine, since not all bits will be used for matching codeword
-			// stuff the overflow with zeroes
-			if (currentByteIndex >= data.length) {
-				result = result << 1;
-				continue;
-			}
-			int bit;
-			if (((data[currentByteIndex] & 0xFF) & (1 << (7 - (bitIndex & 7)))) != 0) {
-				bit = 1;
-			} else {
-				bit = 0;
-			}
-			result = (result << 1) | bit;
-		}
-		return result;
-	}
-
 	public int[] next() {
 		if (!hasNext) {
 			throw new NoSuchElementException();
 		}
 		return currentPixels;
-	}
-
-	public void reset(byte[] data, int qualityLevel) {
-		if (this.qualityLevel == null || this.qualityLevel != qualityLevel) {
-			yDqt = adjustDqt(Y_DQT_DEFAULT, qualityLevel);
-			cbcrDqt = adjustDqt(CB_CR_DQT_DEFAULT, qualityLevel);
-			this.qualityLevel = qualityLevel;
-		}
-		hasNext = false;
-		currentBitIndex = 0;
-		for (int i = 0; i < previousDc.length; i++) {
-			previousDc[i] = 0.0;
-		}
-		this.data = data;
 	}
 
 	private static int[] adjustDqt(int[] defaultTable, int qualityLevel) {
@@ -251,25 +272,6 @@ class DataUnitDecoder {
 			result[i] = tmp;
 		}
 		return result;
-	}
-
-	// TODO always append. Maybe shrink?
-	public void append(byte[] payload) {
-		byte[] newData = new byte[data.length + payload.length];
-		System.arraycopy(data, 0, newData, 0, data.length);
-		System.arraycopy(payload, 0, newData, data.length, payload.length);
-		this.data = newData;
-	}
-
-	public void resetToTheNextByte() {
-		int overflow = currentBitIndex % 8;
-		if (overflow > 0) {
-			currentBitIndex += (8 - currentBitIndex % 8);
-		}
-		// next packet starts with DC = 0
-		for (int i = 0; i < previousDc.length; i++) {
-			previousDc[i] = 0.0;
-		}
 	}
 
 	private static int[] setupDcLookup(DcCode[] dcCodes) {

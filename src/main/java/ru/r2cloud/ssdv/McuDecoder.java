@@ -14,7 +14,7 @@ class McuDecoder {
 	private final ColorComponent crComponent = new ColorComponent();
 
 	private int[] rgb;
-	
+
 	static {
 		// missing MCU = black RGB
 		Arrays.fill(DEFAULT_CBCR_DU, 128);
