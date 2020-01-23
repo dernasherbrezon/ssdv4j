@@ -114,6 +114,9 @@ public class SsdvDecoder implements Iterator<SsdvImage> {
 	}
 
 	private static byte[] skipTheOffset(SsdvPacket packet) {
+		if (packet.getMcuOffset() == 0) {
+			return packet.getPayload();
+		}
 		byte[] data = new byte[packet.getPayload().length - packet.getMcuOffset()];
 		System.arraycopy(packet.getPayload(), packet.getMcuOffset(), data, 0, data.length);
 		return data;
@@ -129,6 +132,8 @@ public class SsdvDecoder implements Iterator<SsdvImage> {
 	private void reset() {
 		previousPacket = null;
 		currentMcu = 0;
+		currentX = 0;
+		currentY = 0;
 	}
 
 	private void fillTheGap(int nextMcu) {

@@ -2,7 +2,8 @@ package ru.r2cloud.ssdv;
 
 import static org.junit.Assert.assertEquals;
 
-import java.io.File;
+import java.awt.image.BufferedImage;
+import java.io.InputStream;
 
 import javax.imageio.ImageIO;
 
@@ -17,10 +18,15 @@ public class SsdvDecoderTest {
 			SsdvDecoder decoder = new SsdvDecoder(is);
 			while (decoder.hasNext()) {
 				SsdvImage cur = decoder.next();
-				ImageIO.write(cur.getImage(), "jpg", new File("output-" + total + ".jpg"));
 				total++;
-				// FIXME
-				break;
+				try (InputStream is1 = SsdvDecoderTest.class.getClassLoader().getResourceAsStream("output-" + cur.getImageId() + ".png")) {
+					BufferedImage expected = ImageIO.read(is1);
+					for (int i = 0; i < expected.getWidth(); i++) {
+						for (int j = 0; j < expected.getHeight(); j++) {
+							assertEquals("failure in image: " + cur.getImageId(), expected.getRGB(i, j), cur.getImage().getRGB(i, j));
+						}
+					}
+				}				
 			}
 		}
 		assertEquals(2, total);

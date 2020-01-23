@@ -148,12 +148,14 @@ class DataUnitDecoder {
 		previousDc[previousDcIndex] = zigzagDct[0];
 		return true;
 	}
-	
-	// TODO always append. Maybe shrink?
+
 	public void append(byte[] payload) {
-		byte[] newData = new byte[data.length + payload.length];
-		System.arraycopy(data, 0, newData, 0, data.length);
-		System.arraycopy(payload, 0, newData, data.length, payload.length);
+		int fullyProcessedBytes = currentBitIndex / 8;
+		int prependFromCurrentData = data.length - fullyProcessedBytes;
+		byte[] newData = new byte[prependFromCurrentData + payload.length];
+		System.arraycopy(data, fullyProcessedBytes, newData, 0, prependFromCurrentData);
+		System.arraycopy(payload, 0, newData, prependFromCurrentData, payload.length);
+		currentBitIndex = currentBitIndex % 8;
 		this.data = newData;
 	}
 
