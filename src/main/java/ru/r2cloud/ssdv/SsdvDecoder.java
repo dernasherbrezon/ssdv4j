@@ -68,6 +68,9 @@ public class SsdvDecoder implements Iterator<SsdvImage> {
 				if (currentPacket.getPacketId() - 1 > previousPacket.getPacketId()) {
 					fillTheGap(currentPacket.getMcuIndex());
 					dataUnitDecoder.reset(skipTheOffset(currentPacket), currentPacket.getJpegQualityLevel());
+				} else if (currentPacket.getPacketId() == previousPacket.getPacketId()) {
+					// duplicate packet
+					continue;
 				} else {
 					dataUnitDecoder.append(currentPacket.getPayload());
 				}
