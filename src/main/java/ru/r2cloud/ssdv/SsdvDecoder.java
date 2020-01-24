@@ -84,6 +84,7 @@ public class SsdvDecoder implements Iterator<SsdvImage> {
 						continue;
 					}
 					drawMcu(rgb);
+					currentImage.incrementSuccessfulMcu();
 					// discard the rest of packet
 					if (currentMcu >= currentImage.getTotalMcu()) {
 						break;
@@ -125,7 +126,6 @@ public class SsdvDecoder implements Iterator<SsdvImage> {
 	private void completeImage() {
 		fillTheGap(currentImage.getTotalMcu());
 		reset();
-		// FIXME set the number of successfull MCU
 		completedImage = currentImage;
 	}
 

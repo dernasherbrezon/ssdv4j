@@ -7,7 +7,7 @@ public class SsdvImage {
 	private int imageId;
 	private int successfulMcu;
 	private int totalMcu;
-	private BufferedImage image;
+	private transient BufferedImage image;
 
 	public int getImageId() {
 		return imageId;
@@ -39,6 +39,10 @@ public class SsdvImage {
 
 	public void setImage(BufferedImage image) {
 		this.image = image;
+	}
+
+	public void incrementSuccessfulMcu() {
+		successfulMcu++;
 	}
 
 }
