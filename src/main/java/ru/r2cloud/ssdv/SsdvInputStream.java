@@ -53,9 +53,6 @@ public class SsdvInputStream implements Iterator<SsdvPacket>, Closeable {
 		result.setPacketId(dis.readUnsignedShort());
 		result.setWidthMcu(dis.readUnsignedByte());
 		result.setHeightMcu(dis.readUnsignedByte());
-		if (result.getWidthMcu() == 0 || result.getHeightMcu() == 0) {
-			throw new IOException("invalid width or height");
-		}
 
 		int flags = dis.readUnsignedByte();
 		result.setJpegQualityLevel(((flags >> 3) & 0b111) ^ 4);

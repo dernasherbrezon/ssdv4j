@@ -7,7 +7,12 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class SsdvDecoder implements Iterator<SsdvImage> {
+
+	private static final Logger LOG = LoggerFactory.getLogger(SsdvDecoder.class);
 
 	private final Iterator<SsdvPacket> packets;
 	private boolean hasNext = false;
@@ -18,7 +23,6 @@ public class SsdvDecoder implements Iterator<SsdvImage> {
 	private int currentX = 0;
 	private int currentY = 0;
 
-	private SsdvPacket currentPacket = null;
 	private SsdvPacket previousPacket = null;
 	private SsdvImage currentImage = null;
 	private SsdvImage completedImage = null;
@@ -44,7 +48,11 @@ public class SsdvDecoder implements Iterator<SsdvImage> {
 
 	private boolean hasNextInternal() {
 		while (packets.hasNext()) {
-			currentPacket = packets.next();
+			SsdvPacket currentPacket = packets.next();
+
+			if (!validate(currentPacket)) {
+				continue;
+			}
 
 			// handle image start/finish
 			if (currentImage == null) {
@@ -115,6 +123,40 @@ public class SsdvDecoder implements Iterator<SsdvImage> {
 		} else {
 			return false;
 		}
+	}
+
+	private static boolean validate(SsdvPacket packet) {
+		if (packet.getWidthMcu() == 0 || packet.getHeightMcu() == 0) {
+			if (LOG.isDebugEnabled()) {
+				LOG.debug("invalid width or height: " + packet);
+			}
+			return false;
+		}
+		if (packet.getHeightMcu() * packet.getWidthMcu() > 65536) {
+			if (LOG.isDebugEnabled()) {
+				LOG.debug("invalid width or height: " + packet);
+			}
+			return false;
+		}
+		if (packet.getPayload() == null) {
+			if (LOG.isDebugEnabled()) {
+				LOG.debug("payload is missing");
+			}
+			return false;
+		}
+		if (packet.getMcuOffset() > packet.getPayload().length) {
+			if (LOG.isDebugEnabled()) {
+				LOG.debug("invalid mcu offset: " + packet);
+			}
+			return false;
+		}
+		if (packet.getPacketId() > 65536) {
+			if (LOG.isDebugEnabled()) {
+				LOG.debug("invalid packet id: " + packet);
+			}
+			return false;
+		}
+		return true;
 	}
 
 	private static byte[] skipTheOffset(SsdvPacket packet) {
