@@ -1,0 +1,20 @@
+language: java
+bundler_args: --retry 1
+
+addons:
+  sonarcloud:
+    organization: "dernasherbrezon-github"
+    token:
+      secure: "POgk2zwQqVBixv3BdcgfFNKDbIB7ph2VdU8YgRyctjCAj5g3SBTcbGxNIQj2ORPYFFMGYLB0FTLa4HQ2Vi7opPZFxFUckwIb2oNyfW9QLEo/I+n7j0rP+5YCa/XYSppxHjGM3udxxFtGpRqnED8OHg7yci/vc44gmkrAD+nMpgaZ1x3GOj6tXe9CQcw0tHHevgTSGA4U6K3NoJvwynOemvN0eonNmSCg09fv827fnxjm1NUDMUCglmkMWTGHzQovzrCO4rigDKmsOo+z4KWVSUzrAg8frqkeEaLmqjG03DYI76BE7Xs+eoAxSb9bPij7fCcy1D0oA4XKkVHYHSEKOlAYclzAp69/nNQBWrUuPf7rKolYg2g9/8aPU2tjeXBmcsk2KLR4DqKEFiXuCbJqOU+AIHBLw6VSM2r7MEvuVeJxbAq2bQe42r5uGBwQpFND+m9DUkmdXbrgRQb8VW3IDtLgJDJtoNEV262UxOT94s9gBS6TwDez3qW4Bq/Yhc+rUNpXVKaaRSTMzheFo6F2w0kWOIpjrrnkU0paNyZdsrHvQgLPZgL4jNlItWZ69ENbBkx8ghfJos3yButtSZU05LvavtVj5IKCK5W6JPpMne01NdGixwvtx+vjXnAADNaQ72Q4xVcWAaP32KjMChIBEJcauI5+6tSNTeXZU8RpDm4="
+
+script:
+  - mvn clean verify sonar:sonar -Pcoverage -Dsonar.scm.disabled=true -Dsonar.language=java
+
+cache:
+  directories:
+  - $HOME/.m2/repository
+  - $HOME/.sonar/cache
+
+before_cache:
+  - rm -rf $HOME/.m2/repository/ru/r2cloud/
+
