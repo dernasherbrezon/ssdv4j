@@ -7,6 +7,7 @@
 	<name>ssdv4j</name>
 	<description>Decode SSDV</description>
 	<inceptionYear>2020</inceptionYear>
+	<url>https://github.com/dernasherbrezon/ssdv4j</url>
 
 	<organization>
 		<name>r2cloud</name>
@@ -181,7 +182,19 @@
 		<developerConnection>scm:git:https://github.com/dernasherbrezon/ssdv4j.git</developerConnection>
 		<tag>HEAD</tag>
 	</scm>
+	
+	<issueManagement>
+		<system>GitHub Issues</system>
+		<url>https://github.com/dernasherbrezon/ssdv4j/issues</url>
+	</issueManagement>
 
+	<distributionManagement>
+		<snapshotRepository>
+			<id>ossrh</id>
+			<url>https://oss.sonatype.org/content/repositories/snapshots</url>
+		</snapshotRepository>
+	</distributionManagement>
+	
 	<licenses>
 		<license>
 			<name>Apache-2.0</name>
