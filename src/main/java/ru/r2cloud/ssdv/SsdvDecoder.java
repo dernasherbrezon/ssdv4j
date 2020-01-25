@@ -128,13 +128,13 @@ public class SsdvDecoder implements Iterator<SsdvImage> {
 	private static boolean validate(SsdvPacket packet) {
 		if (packet.getWidthMcu() == 0 || packet.getHeightMcu() == 0) {
 			if (LOG.isDebugEnabled()) {
-				LOG.debug("invalid width or height: " + packet);
+				LOG.debug("invalid width or height: {}", packet);
 			}
 			return false;
 		}
 		if (packet.getHeightMcu() * packet.getWidthMcu() > 65536) {
 			if (LOG.isDebugEnabled()) {
-				LOG.debug("invalid width or height: " + packet);
+				LOG.debug("invalid width or height: {}", packet);
 			}
 			return false;
 		}
@@ -146,13 +146,13 @@ public class SsdvDecoder implements Iterator<SsdvImage> {
 		}
 		if (packet.getMcuOffset() > packet.getPayload().length) {
 			if (LOG.isDebugEnabled()) {
-				LOG.debug("invalid mcu offset: " + packet);
+				LOG.debug("invalid mcu offset: {}", packet);
 			}
 			return false;
 		}
 		if (packet.getPacketId() > 65536) {
 			if (LOG.isDebugEnabled()) {
-				LOG.debug("invalid packet id: " + packet);
+				LOG.debug("invalid packet id: {}", packet);
 			}
 			return false;
 		}
