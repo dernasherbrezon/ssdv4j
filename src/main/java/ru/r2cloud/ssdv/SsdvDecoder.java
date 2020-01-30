@@ -60,7 +60,11 @@ public class SsdvDecoder implements Iterator<SsdvImage> {
 				mcuDecoder.reset(currentPacket);
 			} else {
 				if (currentImage.getImageId() != currentPacket.getImageId()) {
-					completeImage();
+					if (currentImage.getSuccessfulMcu() > 0) {
+						completeImage();
+					} else {
+						reset();
+					}
 					currentImage = create(currentPacket);
 					mcuDecoder.reset(currentPacket);
 				}
@@ -115,7 +119,7 @@ public class SsdvDecoder implements Iterator<SsdvImage> {
 				return true;
 			}
 		}
-		if (currentImage != null) {
+		if (currentImage != null && currentImage.getSuccessfulMcu() > 0) {
 			// return remaining
 			completeImage();
 			currentImage = null;
