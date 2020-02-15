@@ -10,7 +10,7 @@ Configure maven:
 <dependency>
 	<groupId>ru.r2cloud</groupId>
 	<artifactId>ssdv4j</artifactId>
-	<version>1.1</version>
+	<version>1.3</version>
 </dependency>
 ```
 
