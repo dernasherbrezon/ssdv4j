@@ -41,7 +41,7 @@ public class SsdvInputStream implements Iterator<SsdvPacket>, Closeable {
 	private SsdvPacket readPacket() throws IOException {
 		SsdvPacket result = new SsdvPacket();
 		while (!Thread.currentThread().isInterrupted()) {
-			int currentByte = dis.readByte();
+			int currentByte = (dis.readByte() & 0xFF);
 			if (currentByte != 0x55) {
 				result.setPacketType(currentByte);
 				break;
