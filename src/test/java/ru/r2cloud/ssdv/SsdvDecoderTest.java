@@ -4,7 +4,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 
 import java.awt.image.BufferedImage;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -22,7 +21,7 @@ public class SsdvDecoderTest {
 	public void testSuccess() throws Exception {
 		assertData("jy1sat", 2);
 	}
-	
+
 	@Test
 	public void testDslwpSuccess() throws Exception {
 		assertData("dslwp", 1, null);
@@ -150,14 +149,13 @@ public class SsdvDecoderTest {
 			SsdvDecoder decoder = new SsdvDecoder(is);
 			while (decoder.hasNext()) {
 				SsdvImage cur = decoder.next();
-				ImageIO.write(cur.getImage(), "png", new File("test.png"));
 				actual++;
 				assertSsdvImage(prefix + "-" + cur.getImageId(), cur);
 			}
 		}
 		assertEquals(expected, actual);
 	}
-	
+
 	private static void assertData(String prefix, int expected) throws IOException {
 		assertData(prefix, expected, 189);
 	}

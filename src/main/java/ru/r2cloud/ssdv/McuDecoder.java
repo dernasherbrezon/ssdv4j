@@ -15,28 +15,28 @@ class McuDecoder {
 	private static final int[] SRC_2X1;
 	// map 8x8 -> 16x8
 	private static final int[] SRC_1X2;
+	// map 8x8 -> 8x8
+	private static final int[] SRC_2X2;
+
 	// map 8x8 to 1 of 4 quadrants within 16x16
-	private static final int[] DST_2X2;
-	private static final int[] DST_1X2;
-	private static final int[] DST_2X1;
+	private static final int[] DST_INDEX_MAPPING;
 
 	private final ColorComponent yComponent = new ColorComponent();
 	private final ColorComponent cbComponent = new ColorComponent();
 	private final ColorComponent crComponent = new ColorComponent();
 
 	private int[] rgb;
+	private int mcuHeight;
+	private int mcuWidth;
 
 	static {
 		// missing MCU = black RGB
 		Arrays.fill(DEFAULT_CBCR_DU, 128);
 		SRC_1X1 = setup1x1Table();
-		DST_2X2 = setup2x2Table(2, 2);
-
-		DST_1X2 = setup2x2Table(2, 1);
-		SRC_1X2 = setupSrc1x2Table();
-
-		DST_2X1 = setup2x2Table(1, 2);
-		SRC_2X1 = setupSrc2x1Table();
+		SRC_1X2 = setup1x2Table();
+		SRC_2X1 = setup2x1Table();
+		SRC_2X2 = setup2x2Table();
+		DST_INDEX_MAPPING = setupDstMappingTable();
 	}
 
 	public void reset(SsdvPacket firstPacket) {
@@ -60,9 +60,12 @@ class McuDecoder {
 		cbComponent.reset(3, DEFAULT_SAMPLING, DEFAULT_SAMPLING);
 		crComponent.reset(3, DEFAULT_SAMPLING, DEFAULT_SAMPLING);
 
-		if (rgb == null) {
-			rgb = new int[PIXELS_PER_MCU * PIXELS_PER_MCU];
+		if (rgb == null || rgb.length != yComponent.getBuffer().length) {
+			rgb = new int[yComponent.getBuffer().length];
 		}
+
+		mcuHeight = yComponent.getMaxRows() * DataUnitDecoder.PIXELS_PER_DU;
+		mcuWidth = yComponent.getMaxCols() * DataUnitDecoder.PIXELS_PER_DU;
 	}
 
 	// append until mcu full
@@ -84,10 +87,11 @@ class McuDecoder {
 			}
 		}
 
-		for (int row = 0; row < McuDecoder.PIXELS_PER_MCU; row++) {
-			for (int col = 0; col < McuDecoder.PIXELS_PER_MCU; col++) {
-				int sourceIndex = row * McuDecoder.PIXELS_PER_MCU + col;
-				rgb[sourceIndex] = convertToRgb(yComponent.getBuffer()[sourceIndex], cbComponent.getBuffer()[sourceIndex], crComponent.getBuffer()[sourceIndex]);
+		int[] cbCrIndexMapping = getSrcIndexMapping(yComponent.getSubsamplingMode());
+		for (int row = 0; row < yComponent.getMaxRows() * DataUnitDecoder.PIXELS_PER_DU; row++) {
+			for (int col = 0; col < yComponent.getMaxCols() * DataUnitDecoder.PIXELS_PER_DU; col++) {
+				int sourceIndex = row * yComponent.getMaxCols() * DataUnitDecoder.PIXELS_PER_DU + col;
+				rgb[sourceIndex] = convertToRgb(yComponent.getBuffer()[sourceIndex], cbComponent.getBuffer()[cbCrIndexMapping[sourceIndex]], crComponent.getBuffer()[cbCrIndexMapping[sourceIndex]]);
 			}
 		}
 
@@ -117,24 +121,13 @@ class McuDecoder {
 
 	// can be called multiple times
 	private static void appendDu(int[] du, ColorComponent component) {
-		if (component.getSubsamplingMode() == 3) {
-			for (int i = 0; i < SRC_1X1.length; i++) {
-				component.getBuffer()[i] = du[SRC_1X1[i]];
-			}
-		} else if (component.getSubsamplingMode() == 0) {
+		// shortcut for cbcr and 1x1 mapping
+		if (du.length == component.getBuffer().length) {
+			System.arraycopy(du, 0, component.getBuffer(), 0, du.length);
+		} else {
 			int offset = (component.getCurrentRow() * component.getMaxCols() + component.getCurrentCol()) * DataUnitDecoder.PIXELS_PER_DU * DataUnitDecoder.PIXELS_PER_DU;
 			for (int i = 0; i < du.length; i++) {
-				component.getBuffer()[DST_2X2[offset + i]] = du[i];
-			}
-		} else if (component.getSubsamplingMode() == 2) {
-			int offset = component.getCurrentCol() * McuDecoder.PIXELS_PER_MCU * DataUnitDecoder.PIXELS_PER_DU;
-			for (int i = 0; i < SRC_2X1.length; i++) {
-				component.getBuffer()[DST_2X1[offset + i]] = du[SRC_2X1[i]];
-			}
-		} else if (component.getSubsamplingMode() == 1) {
-			int offset = component.getCurrentRow() * McuDecoder.PIXELS_PER_MCU * DataUnitDecoder.PIXELS_PER_DU;
-			for (int i = 0; i < SRC_1X2.length; i++) {
-				component.getBuffer()[DST_1X2[offset + i]] = du[SRC_1X2[i]];
+				component.getBuffer()[DST_INDEX_MAPPING[offset + i]] = du[i];
 			}
 		}
 
@@ -196,16 +189,67 @@ class McuDecoder {
 		return table;
 	}
 
-	private static int[] setup2x2Table(int maxRows, int maxCols) {
+	private static int[] setup2x1Table() {
+		int[] table = new int[MAX_SAMPLING * DataUnitDecoder.PIXELS_PER_DU * DataUnitDecoder.PIXELS_PER_DU];
+		for (int row = 0, dstRow = 0; row < DataUnitDecoder.PIXELS_PER_DU; row++) {
+			for (int col = 0, dstCol = 0; col < DataUnitDecoder.PIXELS_PER_DU; col++) {
+				table[dstRow * McuDecoder.PIXELS_PER_MCU + dstCol] = row * DataUnitDecoder.PIXELS_PER_DU + col;
+				table[dstRow * McuDecoder.PIXELS_PER_MCU + dstCol + 1] = row * DataUnitDecoder.PIXELS_PER_DU + col;
+				dstCol += MAX_SAMPLING;
+			}
+			dstRow += 1;
+		}
+		return table;
+	}
+
+	private static int[] setup1x2Table() {
+		int[] table = new int[MAX_SAMPLING * DataUnitDecoder.PIXELS_PER_DU * DataUnitDecoder.PIXELS_PER_DU];
+		for (int row = 0, dstRow = 0; row < DataUnitDecoder.PIXELS_PER_DU; row++) {
+			for (int col = 0, dstCol = 0; col < DataUnitDecoder.PIXELS_PER_DU; col++) {
+				table[dstRow * DataUnitDecoder.PIXELS_PER_DU + dstCol] = row * DataUnitDecoder.PIXELS_PER_DU + col;
+				table[(dstRow + 1) * DataUnitDecoder.PIXELS_PER_DU + dstCol] = row * DataUnitDecoder.PIXELS_PER_DU + col;
+				dstCol += 1;
+			}
+			dstRow += MAX_SAMPLING;
+		}
+		return table;
+	}
+
+	// not an actual mapping,
+	// but useful for getSrcIndexMapping()
+	private static int[] setup2x2Table() {
+		int[] result = new int[DataUnitDecoder.PIXELS_PER_DU * DataUnitDecoder.PIXELS_PER_DU];
+		for (int i = 0; i < result.length; i++) {
+			result[i] = i;
+		}
+		return result;
+	}
+
+	private static int[] getSrcIndexMapping(int subsamplingMode) {
+		switch (subsamplingMode) {
+		case 0:
+			return SRC_1X1;
+		case 1:
+			return SRC_1X2;
+		case 2:
+			return SRC_2X1;
+		case 3:
+			return SRC_2X2;
+		default:
+			throw new IllegalArgumentException("unsupported subsampling mode: " + subsamplingMode);
+		}
+	}
+
+	private static int[] setupDstMappingTable() {
 		int[] table = new int[McuDecoder.PIXELS_PER_MCU * McuDecoder.PIXELS_PER_MCU];
 		int cur = 0;
-		for (int k = 0; k < maxRows; k++) {
-			for (int l = 0; l < maxCols; l++) {
-				for (int i = 0; i < McuDecoder.PIXELS_PER_MCU / maxRows; i++) {
-					for (int j = 0; j < McuDecoder.PIXELS_PER_MCU / maxCols; j++) {
-						int col = l * DataUnitDecoder.PIXELS_PER_DU + j;
-						int row = k * maxCols * DataUnitDecoder.PIXELS_PER_DU * DataUnitDecoder.PIXELS_PER_DU + i * maxCols * DataUnitDecoder.PIXELS_PER_DU;
-						table[cur] = row + col;
+		for (int yRow = 0; yRow < MAX_SAMPLING; yRow++) {
+			for (int yCol = 0; yCol < MAX_SAMPLING; yCol++) {
+				for (int duRow = 0; duRow < DataUnitDecoder.PIXELS_PER_DU; duRow++) {
+					for (int duCol = 0; duCol < DataUnitDecoder.PIXELS_PER_DU; duCol++) {
+						int colIndex = yCol * DataUnitDecoder.PIXELS_PER_DU + duCol;
+						int rowIndex = yRow * MAX_SAMPLING * DataUnitDecoder.PIXELS_PER_DU * DataUnitDecoder.PIXELS_PER_DU + duRow * MAX_SAMPLING * DataUnitDecoder.PIXELS_PER_DU;
+						table[cur] = rowIndex + colIndex;
 						cur++;
 					}
 				}
@@ -214,26 +258,11 @@ class McuDecoder {
 		return table;
 	}
 
-	private static int[] setupSrc2x1Table() {
-		int[] table = new int[McuDecoder.PIXELS_PER_MCU * DataUnitDecoder.PIXELS_PER_DU];
-		for (int i = 0, dstI = 0; i < McuDecoder.PIXELS_PER_MCU; i += 2, dstI++) {
-			for (int j = 0; j < DataUnitDecoder.PIXELS_PER_DU; j++) {
-				table[i * DataUnitDecoder.PIXELS_PER_DU + j] = dstI * DataUnitDecoder.PIXELS_PER_DU + j;
-				table[(i + 1) * DataUnitDecoder.PIXELS_PER_DU + j] = dstI * DataUnitDecoder.PIXELS_PER_DU + j;
-			}
-		}
-		return table;
+	public int getMcuHeight() {
+		return mcuHeight;
 	}
 
-	private static int[] setupSrc1x2Table() {
-		int[] table = new int[McuDecoder.PIXELS_PER_MCU * DataUnitDecoder.PIXELS_PER_DU];
-		for (int i = 0, dstI = 0; i < DataUnitDecoder.PIXELS_PER_DU; i += 1, dstI++) {
-			for (int j = 0, dstJ = 0; j < DataUnitDecoder.PIXELS_PER_DU; j += 1, dstJ++) {
-				table[i * McuDecoder.PIXELS_PER_MCU + 2 * j] = dstI * DataUnitDecoder.PIXELS_PER_DU + dstJ;
-				table[i * McuDecoder.PIXELS_PER_MCU + 2 * j + 1] = dstI * DataUnitDecoder.PIXELS_PER_DU + dstJ;
-			}
-		}
-		return table;
+	public int getMcuWidth() {
+		return mcuWidth;
 	}
-
 }

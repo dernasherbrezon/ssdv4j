@@ -201,17 +201,18 @@ public class SsdvDecoder implements Iterator<SsdvImage> {
 			return;
 		}
 
-		for (int j = 0; j < McuDecoder.PIXELS_PER_MCU; j++) {
-			for (int i = 0; i < McuDecoder.PIXELS_PER_MCU; i++) {
-				currentImage.getImage().setRGB(currentX + i, currentY + j, rgb[j * McuDecoder.PIXELS_PER_MCU + i]);
+		for (int j = 0; j < mcuDecoder.getMcuHeight(); j++) {
+			for (int i = 0; i < mcuDecoder.getMcuWidth(); i++) {
+				currentImage.getImage().setRGB(currentX + i, currentY + j, rgb[j * mcuDecoder.getMcuWidth() + i]);
 			}
 		}
 
-		if (currentX + McuDecoder.PIXELS_PER_MCU >= currentImage.getImage().getWidth()) {
+		int nextX = currentX + mcuDecoder.getMcuWidth();
+		if (nextX >= currentImage.getImage().getWidth()) {
 			currentX = 0;
-			currentY += McuDecoder.PIXELS_PER_MCU;
+			currentY += mcuDecoder.getMcuHeight();
 		} else {
-			currentX += McuDecoder.PIXELS_PER_MCU;
+			currentX = nextX;
 		}
 		currentMcu++;
 	}
@@ -220,6 +221,9 @@ public class SsdvDecoder implements Iterator<SsdvImage> {
 		SsdvImage result = new SsdvImage();
 		result.setImageId(firstPacket.getImageId());
 		result.setTotalMcu(firstPacket.getHeightMcu() * firstPacket.getWidthMcu());
+		if (firstPacket.getSubsamplingMode() == 2 || firstPacket.getSubsamplingMode() == 1) {
+			result.setTotalMcu(result.getTotalMcu() * 2);
+		}
 		result.setImage(new BufferedImage(firstPacket.getWidthMcu() * McuDecoder.PIXELS_PER_MCU, firstPacket.getHeightMcu() * McuDecoder.PIXELS_PER_MCU, BufferedImage.TYPE_INT_RGB));
 		return result;
 	}

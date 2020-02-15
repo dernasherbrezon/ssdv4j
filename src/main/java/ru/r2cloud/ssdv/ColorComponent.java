@@ -17,8 +17,9 @@ class ColorComponent {
 		this.subsamplingMode = subsamplingMode;
 		currentCol = 0;
 		currentRow = 0;
-		if (buffer == null) {
-			buffer = new int[McuDecoder.PIXELS_PER_MCU * McuDecoder.PIXELS_PER_MCU];
+		int newLength = maxCols * DataUnitDecoder.PIXELS_PER_DU * maxRows * DataUnitDecoder.PIXELS_PER_DU;
+		if (buffer == null || buffer.length != newLength) {
+			buffer = new int[newLength];
 		}
 	}
 
@@ -82,11 +83,11 @@ class ColorComponent {
 	public int getSubsamplingMode() {
 		return subsamplingMode;
 	}
-	
+
 	public void setSubsamplingMode(int subsamplingMode) {
 		this.subsamplingMode = subsamplingMode;
 	}
-	
+
 	@Override
 	public String toString() {
 		return "[maxCols=" + maxCols + ", maxRows=" + maxRows + ", currentCol=" + currentCol + ", currentRow=" + currentRow + "]";
