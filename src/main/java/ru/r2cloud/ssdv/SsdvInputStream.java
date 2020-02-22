@@ -102,8 +102,7 @@ public class SsdvInputStream implements Iterator<SsdvPacket>, Closeable {
 		if ((ch1 | ch2 | ch3 | ch4) < 0) {
 			throw new EOFException();
 		}
-		return ((ch1 << 24) + (ch2 << 16) + (ch3 << 8) + (ch4 << 0)) & 0xFFFFFFFFL;
-
+		return ((ch1 << 24) + (ch2 << 16) + (ch3 << 8) + ch4) & 0xFFFFFFFFL;
 	}
 
 }
