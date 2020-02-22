@@ -7,6 +7,8 @@ public class SsdvPacket {
 	private int packetId;
 	private int widthMcu;
 	private int heightMcu;
+	
+	private String callsign;
 
 	private int jpegQualityLevel;
 	private boolean lastPacket;
@@ -18,6 +20,14 @@ public class SsdvPacket {
 	private byte[] payload;
 	private int checksum;
 	private byte[] fec;
+	
+	public String getCallsign() {
+		return callsign;
+	}
+	
+	public void setCallsign(String callsign) {
+		this.callsign = callsign;
+	}
 
 	public int getPacketType() {
 		return packetType;

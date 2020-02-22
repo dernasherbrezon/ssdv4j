@@ -2,6 +2,7 @@ package ru.r2cloud.ssdv;
 
 import java.io.Closeable;
 import java.io.DataInputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Iterator;
@@ -47,8 +48,7 @@ public class SsdvInputStream implements Iterator<SsdvPacket>, Closeable {
 				break;
 			}
 		}
-		// ignore callsign for now
-		dis.skipBytes(4);
+		result.setCallsign(Base40.decode(readUnsignedInt(dis)));
 		result.setImageId(dis.readUnsignedByte());
 		result.setPacketId(dis.readUnsignedShort());
 		result.setWidthMcu(dis.readUnsignedByte());
@@ -92,6 +92,18 @@ public class SsdvInputStream implements Iterator<SsdvPacket>, Closeable {
 			throw new NoSuchElementException();
 		}
 		return next;
+	}
+
+	private static long readUnsignedInt(DataInputStream dis) throws IOException {
+		int ch1 = dis.read();
+		int ch2 = dis.read();
+		int ch3 = dis.read();
+		int ch4 = dis.read();
+		if ((ch1 | ch2 | ch3 | ch4) < 0) {
+			throw new EOFException();
+		}
+		return ((ch1 << 24) + (ch2 << 16) + (ch3 << 8) + (ch4 << 0)) & 0xFFFFFFFFL;
+
 	}
 
 }
