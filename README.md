@@ -1,4 +1,4 @@
-## About [![Build Status](https://travis-ci.org/dernasherbrezon/ssdv4j.svg?branch=master)](https://travis-ci.org/dernasherbrezon/ssdv4j) [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=ru.r2cloud%3Assdv4j&metric=alert_status)](https://sonarcloud.io/dashboard?id=ru.r2cloud%3Assdv4j)
+## About [![Build Status](https://travis-ci.com/dernasherbrezon/ssdv4j.svg?branch=master)](https://travis-ci.com/dernasherbrezon/ssdv4j) [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=ru.r2cloud%3Assdv4j&metric=alert_status)](https://sonarcloud.io/dashboard?id=ru.r2cloud%3Assdv4j)
 
 SSDV decoder, written in java.
 
